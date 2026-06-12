@@ -62,13 +62,19 @@ func NewContainer() (*Container, error) {
 		return nil, err
 	}
 
-	jwtProvider, err := jwtprovider.New("")
+	tokenGenerator, err := jwtprovider.NewIssuer("")
 	if err != nil {
-		log.Error().Err(err).Msg("failed to initialize jwt provider")
+		log.Error().Err(err).Msg("failed to initialize jwt issuer")
 		return nil, err
 	}
 
-	jwtMiddleware := middleware.JWTAuth(jwtProvider.Validator())
+	tokenValidator, err := jwtprovider.NewValidator("")
+	if err != nil {
+		log.Error().Err(err).Msg("failed to initialize jwt validator")
+		return nil, err
+	}
+
+	jwtMiddleware := middleware.JWTAuth(tokenValidator)
 
 	// Redis backs the rate limiter only; the health check pings the database, not Redis.
 	rdb, err := pkgRedis.NewClient("")
@@ -85,7 +91,7 @@ func NewContainer() (*Container, error) {
 	rateLimitMiddleware := middleware.RateLimit(rateLimiter)
 
 	healthHandlerInstance := initHealthHandler(cfg, db)
-	authHandlerInstance, err := initAuthHandler(db, jwtProvider.Generator())
+	authHandlerInstance, err := initAuthHandler(db, tokenGenerator)
 	if err != nil {
 		return nil, err
 	}

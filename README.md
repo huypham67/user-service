@@ -33,7 +33,7 @@ Production-ready REST API service for user authentication and profile management
 | Auth | JWT (RSA, issuer) | v5.3.1 |
 | Password Hashing | bcrypt | (golang.org/x/crypto) |
 | Logger | Zerolog | v1.35.1 |
-| Shared Library | bookmark-common | v0.1.0 |
+| Shared Library | bookmark-common | v0.2.0 |
 | API Docs | Swagger (swaggo/gin-swagger) | v1.6.1 |
 | Testing | Testify | v1.11.1 |
 | Migrations | golang-migrate | v4.19.1 |
@@ -226,4 +226,4 @@ Database (PostgreSQL)
 
 ## 🔗 Integration
 
-Consumes `github.com/huypham67/bookmark-common` v0.1.0 for JWT middleware/provider, Redis-backed rate limiting, password hashing, structured logging, request/response helpers, and SQL/Redis clients. As the **JWT issuer**, user-service signs tokens with its private key; other services (e.g. `bookmark-service`) validate them with the matching public key.
+Consumes `github.com/huypham67/bookmark-common` v0.2.0 for JWT middleware/provider, Redis-backed rate limiting, password hashing, structured logging, request/response helpers, and SQL/Redis clients. As the **JWT issuer**, user-service signs tokens with its private key; other services (e.g. `bookmark-service`) validate them with the matching public key.
