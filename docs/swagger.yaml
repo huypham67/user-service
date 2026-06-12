@@ -1,0 +1,290 @@
+definitions:
+  gin.H:
+    additionalProperties: {}
+    type: object
+  github_com_huypham67_user-service_internal_dto_auth.LoginRequest:
+    properties:
+      password:
+        minLength: 8
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  github_com_huypham67_user-service_internal_dto_auth.LoginResponse:
+    properties:
+      data:
+        type: string
+      message:
+        type: string
+      pagination:
+        $ref: '#/definitions/response.Pagination'
+    type: object
+  github_com_huypham67_user-service_internal_dto_auth.RegisterUserRequest:
+    properties:
+      display_name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - display_name
+    - email
+    - password
+    - username
+    type: object
+  github_com_huypham67_user-service_internal_dto_auth.RegisterUserResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_auth.UserData'
+      message:
+        type: string
+      pagination:
+        $ref: '#/definitions/response.Pagination'
+    type: object
+  github_com_huypham67_user-service_internal_dto_auth.UserData:
+    properties:
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      username:
+        type: string
+    type: object
+  github_com_huypham67_user-service_internal_dto_health.HealthCheckResponse:
+    properties:
+      instance_id:
+        type: string
+      message:
+        type: string
+      service_name:
+        type: string
+    type: object
+  github_com_huypham67_user-service_internal_dto_profile.UpdateUserRequest:
+    properties:
+      display_name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      email:
+        type: string
+    type: object
+  github_com_huypham67_user-service_internal_dto_profile.UpdateUserResponse:
+    type: object
+  github_com_huypham67_user-service_internal_dto_profile.UserData:
+    properties:
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      username:
+        type: string
+    type: object
+  github_com_huypham67_user-service_internal_dto_profile.UserResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_profile.UserData'
+      message:
+        type: string
+      pagination:
+        $ref: '#/definitions/response.Pagination'
+    type: object
+  response.Pagination:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: This is the API documentation for the Bookmark Service
+  title: User Service API
+  version: "1.1"
+paths:
+  /health-check:
+    get:
+      consumes:
+      - application/json
+      description: Check application health status and Redis connection
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_health.HealthCheckResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_health.HealthCheckResponse'
+      summary: Health Check
+      tags:
+      - health
+  /v1/self/info:
+    get:
+      consumes:
+      - application/json
+      description: Get authenticated user information from JWT token
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User information
+          schema:
+            $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_profile.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - Bearer: []
+      summary: Get User Info
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      description: Update authenticated user's display name and email
+      parameters:
+      - description: User update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_profile.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User updated successfully
+          schema:
+            $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_profile.UpdateUserResponse'
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/gin.H'
+        "409":
+          description: Email already exists
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/gin.H'
+      security:
+      - Bearer: []
+      summary: Update User Info
+      tags:
+      - users
+  /v1/users/login:
+    post:
+      consumes:
+      - application/json
+      description: Login a user with username and password
+      parameters:
+      - description: User login data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User logged in successfully
+          schema:
+            $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_auth.LoginResponse'
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/gin.H'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/gin.H'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Login User
+      tags:
+      - users
+  /v1/users/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user with email, username, and password
+      parameters:
+      - description: User registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_auth.RegisterUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User registered successfully
+          schema:
+            $ref: '#/definitions/github_com_huypham67_user-service_internal_dto_auth.RegisterUserResponse'
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/gin.H'
+        "409":
+          description: User already exists
+          schema:
+            $ref: '#/definitions/gin.H'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/gin.H'
+      summary: Register User
+      tags:
+      - users
+securityDefinitions:
+  Bearer:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
