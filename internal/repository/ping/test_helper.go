@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func newTestPinger(t *testing.T) (Pinger, *gorm.DB) {
+func newTestSQLDBPinger(t *testing.T) (Pinger, *gorm.DB) {
 	t.Helper()
 
 	mockDB := sqldb.NewMock(t)

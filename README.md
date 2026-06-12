@@ -12,7 +12,8 @@ Production-ready REST API service for user authentication and profile management
 - **User Authentication**: Login with JWT token generation (RSA-based)
 - **User Profiles**: Get and update user information
 - **JWT Middleware**: Token validation and user context extraction
-- **Health Checks**: Database connectivity monitoring
+- **Rate Limiting**: Redis-backed request throttling on all endpoints
+- **Health Checks**: PostgreSQL connectivity monitoring
 - **PostgreSQL Backend**: GORM ORM with migrations
 - **Structured Logging**: Zerolog integration
 - **Comprehensive Testing**: Unit and integration tests with 80% coverage gate
@@ -28,10 +29,12 @@ Production-ready REST API service for user authentication and profile management
 | Web Framework | Gin | v1.12.0 |
 | Database | PostgreSQL | (via GORM) |
 | ORM | GORM | v1.31.1 (postgres driver v1.6.0) |
-| Auth | JWT (RSA) | v5.3.1 |
+| Cache / Rate limit | Redis (go-redis) | v9.19.0 |
+| Auth | JWT (RSA, issuer) | v5.3.1 |
 | Password Hashing | bcrypt | (golang.org/x/crypto) |
 | Logger | Zerolog | v1.35.1 |
-| Shared Library | bookmark-common | local |
+| Shared Library | bookmark-common | v0.1.0 |
+| API Docs | Swagger (swaggo/gin-swagger) | v1.6.1 |
 | Testing | Testify | v1.11.1 |
 | Migrations | golang-migrate | v4.19.1 |
 
@@ -40,54 +43,48 @@ Production-ready REST API service for user authentication and profile management
 ### Prerequisites
 
 - **Go 1.26** or higher
-- **PostgreSQL 12+** (required)
-- **Make** or **PowerShell** (Windows)
+- **PostgreSQL** (required) and **Redis** (rate limiting)
 
-### Installation
+### Run
 
 ```bash
 cd user-service
 go mod download
-go mod tidy
+make gen-keys-local    # RSA key pair — user-service is the JWT signer/issuer
+createdb user_db
+make migrate-up        # apply migrations
+make run               # build + run
+make test              # local tests + coverage (80% gate)
 ```
 
-### Environment Setup
+API base: `http://localhost:8080/api/user_service/v1` · Swagger UI: `http://localhost:8080/swagger/index.html` (`make swagger` to regenerate docs)
 
-Create `.env` file:
+### Environment (`.env`)
 
 ```env
-APP_PORT=8081
+APP_PORT=8080
 SERVICE_NAME=user-service
-JWT_PRIVATE_KEY_PATH=keys/private.pem
-JWT_PUBLIC_KEY_PATH=keys/public.pem
+APP_HOST_NAME=/api/user_service
 DB_HOST=localhost
 DB_PORT=5432
 DB_USER=admin
 DB_PASSWORD=admin
 DB_NAME=user_db
+REDIS_ADDR=localhost:6379
+RATELIMIT_LIMIT=20
+RATELIMIT_WINDOW=10s
+JWT_PRIVATE_KEY_PATH=keys/private.pem
+JWT_PUBLIC_KEY_PATH=keys/public.pem
+JWT_ISSUER=user-service
+JWT_AUDIENCE=bookmark-app
+JWT_EXPIRATION_SECONDS=3600
 ```
-
-### Database Setup
-
-```bash
-createdb user_db
-make run-migrations
-```
-
-### Running
-
-```bash
-make run           # Build and run
-make test          # Run tests
-```
-
-API available at: `http://localhost:8081/api/user_service/v1`
 
 ## 🔌 API Endpoints
 
 ### Base URL
 ```
-http://localhost:8081/api/user_service/v1
+http://localhost:8080/api/user_service/v1
 ```
 
 #### Register User
@@ -136,7 +133,7 @@ Content-Type: application/json
 
 #### Health Check
 ```http
-GET /health-check
+GET /api/user_service/health-check   # service root (not under /v1); pings PostgreSQL
 ```
 
 ## 🧪 Testing
@@ -149,38 +146,26 @@ make test-coverage     # View HTML coverage report
 
 Coverage threshold: **80%** on business logic
 
-## 🛠️ Available Make Targets
+## 🛠️ Make Targets
 
-```bash
-make help              # Show all targets
-make test              # Run tests with coverage
-make docker-test       # Test in Docker
-make docker-sonar      # SonarCloud scan
-make build             # Build binary
-make run               # Run service
-make fmt               # Format code
-make vet               # Run vet
-make lint              # Run linter
-make clean             # Remove artifacts
-```
+Run `make help` for the full list. Grouped:
+
+- **Dev**: `run` · `dev` (fmt→vet→test→swagger→run) · `fmt` · `vet` · `lint` · `tidy` · `vendor`
+- **Database**: `migrate-up` · `migrate-down` · `migrate-force` · `migrate-version`
+- **Testing**: `test` · `test-coverage`
+- **Build**: `build` · `build-linux` · `build-macos` · `build-windows` · `build-prod` · `release`
+- **Mocks**: `generate-mocks` · `clean-mocks`
+- **Docker / CI**: `docker-test` · `docker-sonar` · `docker-build-push` · `docker-run` · `docker-stop` · `docker-logs` · `docker-shell` · `docker-clean`
+- **Utilities**: `swagger` · `gen-keys-local` · `install-tools` · `info` · `clean` · `clean-all`
+
+The **Makefile is the single source of truth** for coverage/quality-gate exclusions (`INFRA_DIRS` / `SYSTEM_DIRS`); `sonar-project.properties` carries identity/scope only.
 
 ## 🐳 Docker
 
-### Build
 ```bash
-docker build -t user-service:latest .
-```
-
-### Run
-```bash
-docker run -d \
-  -e APP_PORT=8081 \
-  -e DB_HOST=host.docker.internal \
-  -e JWT_PRIVATE_KEY_PATH=/keys/private.pem \
-  -e JWT_PUBLIC_KEY_PATH=/keys/public.pem \
-  -v /path/to/keys:/keys \
-  -p 8081:8081 \
-  user-service:latest
+make docker-build-push   # multi-stage build (base → build → test-exec → test → final)
+make docker-run          # run the image with --env-file .env on port 8080
+make docker-test         # run the test stage and extract coverage (as CI does)
 ```
 
 ## 🔄 CI/CD
@@ -241,21 +226,4 @@ Database (PostgreSQL)
 
 ## 🔗 Integration
 
-Uses shared library `bookmark-common`:
-- JWT middleware for authentication
-- Zerolog for structured logging
-- Common error handling
-- Database utilities
-
-## 📄 License
-
-Part of bookmark microservices architecture.
-
-## 🔗 Useful Links
-
-- [Go](https://golang.org/)
-- [Gin Framework](https://gin-gonic.com/)
-- [GORM](https://gorm.io/)
-- [PostgreSQL](https://www.postgresql.org/)
-- [JWT](https://jwt.io/)
-- [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+Consumes `github.com/huypham67/bookmark-common` v0.1.0 for JWT middleware/provider, Redis-backed rate limiting, password hashing, structured logging, request/response helpers, and SQL/Redis clients. As the **JWT issuer**, user-service signs tokens with its private key; other services (e.g. `bookmark-service`) validate them with the matching public key.

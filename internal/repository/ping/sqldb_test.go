@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPinger_Ping(t *testing.T) {
+func TestSqlDBPinger_Ping(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -34,7 +34,7 @@ func TestPinger_Ping(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			pinger, mockDB := newTestPinger(t)
+			pinger, mockDB := newTestSQLDBPinger(t)
 
 			if tc.name == "should return error when the database is closed" {
 				sqlDB, err := mockDB.DB()
