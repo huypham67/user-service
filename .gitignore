@@ -22,6 +22,9 @@ user-service
 # Dependencies
 vendor/
 
+# Keys
+*.pem
+
 # Test & Coverage
 *.log
 coverage.txt
@@ -31,9 +34,6 @@ coverage/
 coverage.html
 coverage.tmp
 coverage_report/
-
-# Keys
-*.pem
 
 CLAUDE.md
 
