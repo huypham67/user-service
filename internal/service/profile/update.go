@@ -7,11 +7,15 @@ import (
 	"github.com/huypham67/bookmark-common/pkg/dbutils"
 	profileDTO "github.com/huypham67/user-service/internal/dto/profile"
 	"github.com/huypham67/user-service/internal/model"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/rs/zerolog/log"
 )
 
 // UpdateUserInfo updates user's display name and email.
 func (s *service) UpdateUserInfo(ctx context.Context, userID string, req profileDTO.UpdateUserRequest) error {
+	segment := newrelic.FromContext(ctx).StartSegment("service.profile.UpdateUserInfo")
+	defer segment.End()
+
 	// Verify user exists
 	_, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {

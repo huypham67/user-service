@@ -9,6 +9,7 @@ import (
 	"github.com/huypham67/bookmark-common/pkg/response"
 	authDTO "github.com/huypham67/user-service/internal/dto/auth"
 	"github.com/huypham67/user-service/internal/service/auth"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/rs/zerolog/log"
 )
 
@@ -26,6 +27,9 @@ import (
 // @Failure 500 {object} gin.H "Internal server error"
 // @Router /v1/users/register [post]
 func (h *handler) Register(c *gin.Context) {
+	segment := newrelic.FromContext(c).StartSegment("handler.auth.Register")
+	defer segment.End()
+
 	req, err := requestutils.Bind[authDTO.RegisterUserRequest](c)
 
 	if err != nil {

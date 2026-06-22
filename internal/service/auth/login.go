@@ -7,14 +7,33 @@ import (
 	"github.com/huypham67/bookmark-common/pkg/dbutils"
 	"github.com/huypham67/bookmark-common/pkg/security"
 	authDTO "github.com/huypham67/user-service/internal/dto/auth"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	eventLoginFailure  = "LoginFailure"
+	metricLoginFailure = "Custom/Auth/LoginFailure"
+	reasonInvalidCreds = "invalid_credentials"
+)
+
+func recordLoginFailure(ctx context.Context) {
+	app := newrelic.FromContext(ctx).Application()
+	app.RecordCustomMetric(metricLoginFailure, 1)
+	app.RecordCustomEvent(eventLoginFailure, map[string]interface{}{
+		"reason": reasonInvalidCreds,
+	})
+}
+
 // LoginUser authenticates a user by validating credentials and returns a JWT token.
 func (s *service) LoginUser(ctx context.Context, req authDTO.LoginRequest) (string, error) {
+	segment := newrelic.FromContext(ctx).StartSegment("service.auth.LoginUser")
+	defer segment.End()
+
 	user, err := s.userRepo.GetByUsername(ctx, req.Username)
 	if err != nil {
 		if errors.Is(err, dbutils.ErrRecordNotFoundType) {
+			recordLoginFailure(ctx)
 			return "", ErrInvalidCredentials
 		}
 		log.Error().
@@ -25,11 +44,14 @@ func (s *service) LoginUser(ctx context.Context, req authDTO.LoginRequest) (stri
 	}
 
 	if user == nil {
+		recordLoginFailure(ctx)
 		return "", ErrInvalidCredentials
 	}
 
-	if err := s.passwordHasher.Compare(user.Password, req.Password); err != nil {
+	compareErr := s.passwordHasher.Compare(user.Password, req.Password)
+	if err := compareErr; err != nil {
 		if errors.Is(err, security.ErrPasswordMismatch) {
+			recordLoginFailure(ctx)
 			return "", ErrInvalidCredentials
 		}
 		log.Error().
