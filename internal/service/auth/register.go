@@ -7,11 +7,15 @@ import (
 	"github.com/huypham67/bookmark-common/pkg/dbutils"
 	authDTO "github.com/huypham67/user-service/internal/dto/auth"
 	"github.com/huypham67/user-service/internal/model"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/rs/zerolog/log"
 )
 
 // RegisterUser registers a new user by hashing the password and saving to the database.
 func (s *service) RegisterUser(ctx context.Context, req authDTO.RegisterUserRequest) (*model.User, error) {
+	segment := newrelic.FromContext(ctx).StartSegment("service.auth.RegisterUser")
+	defer segment.End()
+
 	hashedPassword, err := s.passwordHasher.Hash(req.Password)
 	if err != nil {
 		log.Error().
