@@ -3,16 +3,13 @@ package bootstrap
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/huypham67/bookmark-common/middleware"
-	pkgRedis "github.com/huypham67/bookmark-common/pkg/redis"
-	"github.com/huypham67/bookmark-common/pkg/sqldb"
-	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog/log"
-	"gorm.io/gorm"
-
 	"github.com/huypham67/bookmark-common/pkg/jwt"
 	jwtprovider "github.com/huypham67/bookmark-common/pkg/jwt/provider"
 	ratelimitprovider "github.com/huypham67/bookmark-common/pkg/ratelimit/provider"
+	pkgRedis "github.com/huypham67/bookmark-common/pkg/redis"
 	"github.com/huypham67/bookmark-common/pkg/security"
+	"github.com/huypham67/bookmark-common/pkg/sqldb"
+	"github.com/huypham67/bookmark-common/pkg/tracing"
 	authHandler "github.com/huypham67/user-service/internal/handler/auth"
 	healthHandler "github.com/huypham67/user-service/internal/handler/health"
 	profileHandler "github.com/huypham67/user-service/internal/handler/profile"
@@ -21,22 +18,24 @@ import (
 	authSvc "github.com/huypham67/user-service/internal/service/auth"
 	healthSvc "github.com/huypham67/user-service/internal/service/health"
 	profileSvc "github.com/huypham67/user-service/internal/service/profile"
+	"github.com/newrelic/go-agent/v3/integrations/nrredis-v9"
+	"github.com/newrelic/go-agent/v3/newrelic"
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
 
 // Container holds the application's dependencies and initialized services.
-// It serves as the single source of truth for all infrastructure and business logic components.
 type Container struct {
-	// Infrastructure
 	Config *Config
 	DB     *gorm.DB
 	Redis  *redis.Client
+	NRApp  *newrelic.Application
 
-	// Handlers
 	HealthHandler  healthHandler.Handler
 	AuthHandler    authHandler.Handler
 	ProfileHandler profileHandler.Handler
 
-	// Middleware
 	JWTMiddleware       gin.HandlerFunc
 	RateLimitMiddleware gin.HandlerFunc
 }
@@ -50,7 +49,13 @@ func NewContainer() (*Container, error) {
 		return nil, err
 	}
 
-	db, err := sqldb.NewClient("")
+	nrApp, err := tracing.NewApplication("")
+	if err != nil {
+		log.Error().Err(err).Msg("failed to initialize New Relic")
+		return nil, err
+	}
+
+	db, err := sqldb.NewInstrumentedClient("")
 	if err != nil {
 		log.Error().Err(err).Msg("failed to initialize postgres client")
 		return nil, err
@@ -82,6 +87,7 @@ func NewContainer() (*Container, error) {
 		log.Error().Err(err).Msg("failed to initialize redis client")
 		return nil, err
 	}
+	rdb.AddHook(nrredis.NewHook(rdb.Options()))
 
 	rateLimiter, err := ratelimitprovider.New(rdb, "")
 	if err != nil {
@@ -101,6 +107,7 @@ func NewContainer() (*Container, error) {
 		Config:              cfg,
 		DB:                  db,
 		Redis:               rdb,
+		NRApp:               nrApp,
 		HealthHandler:       healthHandlerInstance,
 		AuthHandler:         authHandlerInstance,
 		ProfileHandler:      profileHandlerInstance,
@@ -129,18 +136,18 @@ func initHealthHandler(cfg *Config, database *gorm.DB) healthHandler.Handler {
 	return healthHandler.NewHandler(healthService)
 }
 
-// Close gracefully shuts down the database and Redis clients, ensuring that all resources are properly released.
+// Close gracefully shuts down all resources.
 func (c *Container) Close() error {
 	if c.Redis != nil {
 		_ = c.Redis.Close()
 	}
-
 	if c.DB != nil {
-		sqlDB, err := c.DB.DB()
-		if err == nil {
+		if sqlDB, err := c.DB.DB(); err == nil {
 			_ = sqlDB.Close()
 		}
 	}
-
+	if c.NRApp != nil {
+		c.NRApp.Shutdown(0)
+	}
 	return nil
 }
